@@ -1,59 +1,40 @@
-# Diffusion Posterior Sampling for General Noisy Inverse Problems (ICLR 2023 spotlight)
+# Solving Inverse Problems with Latent Diffusion Models via Hard Data Consistency (ICLR 2024)
 
-![result-gif1](./figures/motion_blur.gif)
-![result-git2](./figures/super_resolution.gif)
-<!-- See more results in the [project-page](https://jeongsol-kim.github.io/dps-project-page) -->
+![example](https://github.com/soominkwon/resample/blob/main/figures/resample_ex.png)
 
 ## Abstract
-In this work, we extend diffusion solvers to efficiently handle general noisy (non)linear inverse problems via the approximation of the posterior sampling. Interestingly, the resulting posterior sampling scheme is a blended version of the diffusion sampling with the manifold constrained gradient without strict measurement consistency projection step, yielding more desirable generative path in noisy settings compared to the previous studies.
 
-![cover-img](./figures/cover.jpg)
+In this work, we propose ReSample, an algorithm that can solve general inverse problems with pre-trained latent diffusion models. Our algorithm incorporates data consistency by solving an optimization problem during the reverse sampling process, a concept that we term as hard data consistency. Upon solving this optimization problem, we propose a novel resampling scheme to map the measurement-consistent sample back onto the noisy data manifold.
 
-
-## Prerequisites
-- python 3.8
-
-- pytorch 1.11.0
-
-- CUDA 11.3.1
-
-- nvidia-docker (if you use GPU in docker container)
-
-It is okay to use lower version of CUDA with proper pytorch version.
-
-Ex) CUDA 10.2 with pytorch 1.7.0
-
-<br />
-
-## Getting started 
+## Getting Started
 
 ### 1) Clone the repository
 
 ```
-git clone https://github.com/DPS2022/diffusion-posterior-sampling
+git clone https://github.com/soominkwon/resample.git
 
-cd diffusion-posterior-sampling
+cd resample
 ```
 
 <br />
 
-### 2) Download pretrained checkpoint
-From the [link](https://drive.google.com/drive/folders/1jElnRoFv7b31fG0v6pTSQkelbSX3xGZh?usp=sharing), download the checkpoint "ffhq_10m.pt" and paste it to ./models/
-```
-mkdir models
-mv {DOWNLOAD_DIR}/ffqh_10m.pt ./models/
-```
-{DOWNLOAD_DIR} is the directory that you downloaded checkpoint to.
+### 2) Download pretrained checkpoints (autoencoders and model)
 
-:speaker: Checkpoint for imagenet is uploaded.
+```
+mkdir -p models/ldm
+wget https://ommer-lab.com/files/latent-diffusion/ffhq.zip -P ./models/ldm
+unzip models/ldm/ffhq.zip -d ./models/ldm
+
+mkdir -p models/first_stage_models/vq-f4
+wget https://ommer-lab.com/files/latent-diffusion/vq-f4.zip -P ./models/first_stage_models/vq-f4
+unzip models/first_stage_models/vq-f4/vq-f4.zip -d ./models/first_stage_models/vq-f4
+```
 
 <br />
-
 
 ### 3) Set environment
-### [Option 1] Local environment setting
 
-We use the external codes for motion-blurring and non-linear deblurring.
+We use the external codes for motion-blurring and non-linear deblurring following the DPS codebase.
 
 ```
 git clone https://github.com/VinAIResearch/blur-kernel-space-exploring bkse
@@ -61,32 +42,10 @@ git clone https://github.com/VinAIResearch/blur-kernel-space-exploring bkse
 git clone https://github.com/LeviBorodenko/motionblur motionblur
 ```
 
-Install dependencies
+Install dependencies via
 
 ```
-conda create -n DPS python=3.8
-
-conda activate DPS
-
-pip install -r requirements.txt
-
-pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 --extra-index-url https://download.pytorch.org/whl/cu113
-```
-
-<br />
-
-### [Option 2] Build Docker image
-
-Install docker engine, GPU driver and proper cuda before running the following commands.
-
-Dockerfile already contains command to clone external codes. You don't have to clone them again.
-
---gpus=all is required to use local GPU device (Docker >= 19.03)
-
-```
-docker build -t dps-docker:latest .
-
-docker run -it --rm --gpus=all dps-docker
+conda env create -f environment.yaml
 ```
 
 <br />
@@ -94,65 +53,47 @@ docker run -it --rm --gpus=all dps-docker
 ### 4) Inference
 
 ```
-python3 sample_condition.py \
---model_config=configs/model_config.yaml \
---diffusion_config=configs/diffusion_config.yaml \
---task_config={TASK-CONFIG};
+python3 sample_condition.py
 ```
 
+The code is currently configured to do inference on FFHQ. You can download the corresponding models from https://github.com/CompVis/latent-diffusion/tree/main and modify the checkpoint paths for other datasets and models.
 
-:speaker: For imagenet, use configs/imagenet_model_config.yaml
 
 <br />
 
-## Possible task configurations
+## Task Configurations
 
 ```
 # Linear inverse problems
-- configs/super_resolution_config.yaml
-- configs/gaussian_deblur_config.yaml
-- configs/motion_deblur_config.yaml
-- configs/inpainting_config.yaml
+- configs/tasks/super_resolution_config.yaml
+- configs/tasks/gaussian_deblur_config.yaml
+- configs/tasks/motion_deblur_config.yaml
+- configs/tasks/inpainting_config.yaml
 
 # Non-linear inverse problems
-- configs/nonlinear_deblur_config.yaml
-- configs/phase_retrieval_config.yaml
+- configs/tasks/nonlinear_deblur_config.yaml
 ```
 
-### Structure of task configurations
-You need to write your data directory at data.root. Default is ./data/samples which contains three sample images from FFHQ validation set.
+<br />
 
-```
-conditioning:
-    method: # check candidates in guided_diffusion/condition_methods.py
-    params:
-        scale: 0.5
+## Hyperparameter Tuning
 
-data:
-    name: ffhq
-    root: ./data/samples/
+For the best results, please refer to the hyperparameters reported in the paper. Recall that we use two types of optimizations for hard data consistency: latent space and pixel space optimization. For the fastest inference, one can use just pixel space optimization, but with a degradation in performance. One can change the splits of pixel space and latent space optimization by tuning the index split value in the main DDIM code. We suggest to use both as reported in the main paper. 
 
-measurement:
-    operator:
-        name: # check candidates in guided_diffusion/measurements.py
+<br />
 
-noise:
-    name:   # gaussian or poisson
-    sigma:  # if you use name: gaussian, set this.
-    (rate:) # if you use name: poisson, set this.
-```
 
 ## Citation
 If you find our work interesting, please consider citing
 
 ```
 @inproceedings{
-chung2023diffusion,
-title={Diffusion Posterior Sampling for General Noisy Inverse Problems},
-author={Hyungjin Chung and Jeongsol Kim and Michael Thompson Mccann and Marc Louis Klasky and Jong Chul Ye},
-booktitle={The Eleventh International Conference on Learning Representations },
-year={2023},
-url={https://openreview.net/forum?id=OnD9zGAGT0k}
+song2024solving,
+title={Solving Inverse Problems with Latent Diffusion Models via Hard Data Consistency},
+author={Bowen Song and Soo Min Kwon and Zecheng Zhang and Xinyu Hu and Qing Qu and Liyue Shen},
+booktitle={The Twelfth International Conference on Learning Representations},
+year={2024},
+url={https://openreview.net/forum?id=j8hdRqOUhN}
 }
 ```
 

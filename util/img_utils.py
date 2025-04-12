@@ -42,12 +42,18 @@ def clear(x):
     return normalize_np(x)
 
 
+#def clear_color(x):
+#    if torch.is_complex(x):
+#        x = torch.abs(x)
+#    x = x.detach().cpu().squeeze().numpy()
+#    return normalize_np(np.transpose(x, (1, 2, 0)))
+
 def clear_color(x):
     if torch.is_complex(x):
         x = torch.abs(x)
     x = x.detach().cpu().squeeze().numpy()
-    return normalize_np(np.transpose(x, (1, 2, 0)))
-
+    x = np.clip(x, -1, 1)
+    return ((np.transpose(x, (1, 2, 0))) + 1)/2
 
 def normalize_np(img):
     """ Normalize img in arbitrary range to [0, 1] """
