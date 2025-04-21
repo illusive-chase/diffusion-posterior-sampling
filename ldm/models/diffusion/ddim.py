@@ -10,7 +10,6 @@ from ldm.modules.diffusionmodules.util import (
     make_ddim_timesteps,
     noise_like,
 )
-from ldm.modules.distributions.distributions import DiagonalGaussianDistribution
 from scripts.utils import *
 
 
@@ -305,9 +304,7 @@ class DDIMSampler(object):
                                                           operator_fn=operator_fn)
                         
                         opt_var = self.model.encode_first_stage(opt_var) # Going back into latent space
-
-                        if isinstance(opt_var, DiagonalGaussianDistribution):
-                            opt_var = opt_var.sample()
+                        opt_var = self.model.get_first_stage_encoding(opt_var)
 
                         img = self.stochastic_resample(pseudo_x0=opt_var, x_t=x_t, a_t=a_prev, sigma=sigma)
                         img = img.requires_grad_() # Seems to need to require grad here

@@ -65,7 +65,7 @@ print(f"Conditioning sampler : {task_config['conditioning']['main_sampler']}")
 sample_fn = partial(sampler.posterior_sampler, measurement_cond_fn=measurement_cond_fn, operator_fn=operator.forward,
                                         S=args.ddim_steps,
                                         cond_method=task_config['conditioning']['main_sampler'],
-                                        conditioning=model.get_learned_conditioning(args.n_samples_per_class * ["human face"]),
+                                        conditioning=model.get_learned_conditioning(args.n_samples_per_class * [""]),
                                         ddim_use_original_steps=True,
                                         batch_size=args.n_samples_per_class,
                                         shape=[4, 64, 64], # Dimension of latent space
