@@ -142,6 +142,8 @@ class DDIMSampler(object):
                log_every_t=100,
                unconditional_guidance_scale=1.,
                unconditional_conditioning=None,
+               eps=1e-3,
+               max_iters=2000,
                # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
                **kwargs
                ):
@@ -180,6 +182,8 @@ class DDIMSampler(object):
                                                         log_every_t=log_every_t,
                                                         unconditional_guidance_scale=unconditional_guidance_scale,
                                                         unconditional_conditioning=unconditional_conditioning,
+                                                        eps=eps,
+                                                        max_iters=max_iters,
                                                         )
             
         else:
@@ -193,7 +197,7 @@ class DDIMSampler(object):
                      callback=None, timesteps=None, quantize_denoised=False,
                      mask=None, x0=None, img_callback=None, log_every_t=100,
                      temperature=1., noise_dropout=0., score_corrector=None, corrector_kwargs=None,
-                     unconditional_guidance_scale=1., unconditional_conditioning=None,):
+                     unconditional_guidance_scale=1., unconditional_conditioning=None, eps=1e-3, max_iters=2000):
         """
         DDIM-based sampling function for ReSample.
 
@@ -301,7 +305,7 @@ class DDIMSampler(object):
 
                         opt_var = self.pixel_optimization(measurement=measurement, 
                                                           x_prime=pseudo_x0_pixel,
-                                                          operator_fn=operator_fn)
+                                                          operator_fn=operator_fn, eps=eps, max_iters=max_iters)
                         
                         opt_var = self.model.encode_first_stage(opt_var) # Going back into latent space
                         opt_var = self.model.get_first_stage_encoding(opt_var)
@@ -315,7 +319,7 @@ class DDIMSampler(object):
                         # Enforcing consistency via latent space optimization
                         pseudo_x0, _ = self.latent_optimization(measurement=measurement,
                                                              z_init=pseudo_x0.detach(),
-                                                             operator_fn=operator_fn)
+                                                             operator_fn=operator_fn, eps=eps, max_iters=max_iters)
 
 
                         sigma = 40 * (1-a_prev)/(1 - a_t) * (1 - a_t / a_prev) # Change the 40 value for each task
