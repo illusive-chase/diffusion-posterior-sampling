@@ -29,9 +29,12 @@ parser.add_argument('--ldm_config', default="configs/stable-diffusion/v1-inferen
 parser.add_argument('--diffusion_config', default="models/v1-5-pruned.ckpt", type=str)
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--dir', type=str, default='./outputs/forest')
+parser.add_argument('--name', '-n', type=str, default='psld')
 parser.add_argument('--ddim_steps', default=500, type=int)
 parser.add_argument('--ddim_eta', default=0.0, type=float)
 parser.add_argument('--ddim_scale', default=1.0, type=float)
+parser.add_argument('--a', '-a', default=1, type=float, help="anneal: a*exp(-b*r)")
+parser.add_argument('--b', '-b', default=1, type=float, help="anneal: a*exp(-b*r)")
 parser.add_argument('--gamma', default=0.1, type=float, help="inpainting error")
 parser.add_argument('--omega', default=0.1, type=float, help="measurement error")
 
@@ -44,7 +47,7 @@ device = torch.device(device_str)
 
 # Loading model
 model = get_model(args)
-sampler = DDIMSampler(model) # Sampling using DDIM
+sampler = DDIMSampler(model, a=args.a, b=args.b) # Sampling using DDIM
 
 # Prepare Operator and noise
 operator = InpaintingOperator(device=device)
@@ -97,4 +100,4 @@ recon = clear_color(x_samples_ddim)
 
 # Saving images
 plt.imsave(os.path.join(args.dir, 'psld_label.png'), label)
-plt.imsave(os.path.join(args.dir, 'psld.png'), recon)
+plt.imsave(os.path.join(args.dir, f'{args.name}.png'), recon)

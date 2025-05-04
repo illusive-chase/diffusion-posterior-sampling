@@ -13,11 +13,13 @@ from ldm.modules.diffusionmodules.util import (
 
 
 class DDIMSampler(object):
-    def __init__(self, model, schedule="linear", **kwargs):
+    def __init__(self, model, schedule="linear", a=1., b=1., **kwargs):
         super().__init__()
         self.model = model
         self.ddpm_num_timesteps = model.num_timesteps
         self.schedule = schedule
+        self.a = a
+        self.b = b
 
     def register_buffer(self, name, attr):
         if type(attr) == torch.Tensor:
@@ -263,7 +265,7 @@ class DDIMSampler(object):
             inpaint_error = torch.linalg.norm(encoded_z_0 - pred_z_0)
             
             error = inpaint_error * gamma + meas_error * omega
-            anealed = error * (3 * (-t / 999 * 3).exp())
+            anealed = error * (self.a * (-t / 999 * self.b).exp())
             gradients = torch.autograd.grad(anealed, inputs=z_t)[0]
             z_prev = z_prev - gradients
             print(f'Loss: {error.item():.3f}, Anealed Loss: {anealed.item():.3f}')
