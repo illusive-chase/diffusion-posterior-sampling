@@ -8,17 +8,13 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import torch
-import torchvision.transforms as transforms
 from omegaconf import OmegaConf
-from skimage.metrics import peak_signal_noise_ratio as psnr
-
-from data.dataloader import get_dataloader, get_dataset
-from ldm.models.diffusion.ddim import DDIMSampler
-from ldm_inverse.condition_methods import get_conditioning_method
-from ldm_inverse.measurements import get_noise, InpaintingOperator
-from model_loader import load_model_from_config, load_yaml
-from scripts.utils import clear_color, mask_generator
 from rfstudio.io import load_float32_image
+
+from ldm.models.diffusion.ddim import DDIMSampler
+from ldm_inverse.measurements import InpaintingOperator, get_noise
+from model_loader import load_model_from_config
+from scripts.utils import clear_color
 
 
 def get_model(args):
@@ -36,6 +32,8 @@ parser.add_argument('--dir', type=str, default='./outputs/forest')
 parser.add_argument('--ddim_steps', default=500, type=int)
 parser.add_argument('--ddim_eta', default=0.0, type=float)
 parser.add_argument('--ddim_scale', default=1.0, type=float)
+parser.add_argument('--gamma', default=0.1, type=float, help="inpainting error")
+parser.add_argument('--omega', default=0.1, type=float, help="measurement error")
 
 args = parser.parse_args()
 
@@ -53,26 +51,7 @@ operator = InpaintingOperator(device=device)
 noiser = get_noise(name='gaussian', sigma=0.01)
 print("Operation: inpainting / Noise: gaussian")
 
-# Prepare conditioning method
-cond_method = get_conditioning_method('ps', model, operator, noiser, scale=0.5)
-measurement_cond_fn = cond_method.conditioning
-print("Conditioning sampler : resample")
-
-# Instantiating sampler
-sample_fn = partial(sampler.posterior_sampler, measurement_cond_fn=measurement_cond_fn, operator_fn=operator.forward,
-                                        S=args.ddim_steps,
-                                        cond_method='resample',
-                                        conditioning=model.get_learned_conditioning([""]),
-                                        ddim_use_original_steps=True,
-                                        batch_size=1,
-                                        shape=[4, 64, 64], # Dimension of latent space
-                                        verbose=False,
-                                        unconditional_guidance_scale=args.ddim_scale,
-                                        unconditional_conditioning=None, 
-                                        eta=args.ddim_eta,
-                                        eps=1e-2,
-                                        max_iters=500,
-                                        )
+print("Conditioning sampler : psld")
 
 mask = 1 - load_float32_image(Path(args.dir) / 'to_inpaint.png')[..., 1].unsqueeze(0).to(device)
 ref_img = load_float32_image(Path(args.dir) / 'warped.png').to(device).permute(2, 0, 1).contiguous() * 2 - 1
@@ -83,8 +62,6 @@ print(f"Inference for image {args.dir}/warped.png")
 
 # Exception) In case of inpainting
 operator_fn = partial(operator.forward, mask=mask)
-measurement_cond_fn = partial(cond_method.conditioning, mask=mask)
-sample_fn = partial(sample_fn, measurement_cond_fn=measurement_cond_fn, operator_fn=operator_fn)
 
 # Forward measurement model
 y = operator_fn(ref_img)
@@ -92,7 +69,25 @@ y = operator_fn(ref_img)
 y_n = y
 
 # Sampling
-samples_ddim, _ = sample_fn(measurement=y_n)
+
+with model.ema_scope():
+    samples_ddim, _ = sampler.sample(S=args.ddim_steps,
+                                    batch_size=1,
+                                    shape=[4, 64, 64],
+                                    verbose=False,
+                                    conditioning=model.get_learned_conditioning([""]),
+                                    unconditional_guidance_scale=args.ddim_scale,
+                                    unconditional_conditioning=None,
+                                    eta=args.ddim_eta,
+                                    x_T=None,
+                                    ip_mask = mask,
+                                    measurements = y_n,
+                                    operator = operator,
+                                    gamma = args.gamma,
+                                    inpainting = True,
+                                    omega = args.omega,
+                                    general_inverse=False,
+                                    noiser=noiser)
 
 x_samples_ddim = model.decode_first_stage(samples_ddim.detach())
 
@@ -101,5 +96,5 @@ label = clear_color(y_n)
 recon = clear_color(x_samples_ddim)
 
 # Saving images
-plt.imsave(os.path.join(args.dir, 'resample_label.png'), label)
-plt.imsave(os.path.join(args.dir, 'resample.png'), recon)
+plt.imsave(os.path.join(args.dir, 'psld_label.png'), label)
+plt.imsave(os.path.join(args.dir, 'psld.png'), recon)
