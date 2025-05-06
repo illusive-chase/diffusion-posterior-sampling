@@ -838,7 +838,7 @@ class LatentDiffusion(DDPM):
             else:
                 return self.first_stage_model.decode(z)
 
-    @torch.no_grad()
+    # @torch.no_grad()
     def encode_first_stage(self, x):
         if hasattr(self, "split_input_params"):
             if self.split_input_params["patch_distributed_vq"]:
@@ -894,7 +894,7 @@ class LatentDiffusion(DDPM):
                 c = self.q_sample(x_start=c, t=tc, noise=torch.randn_like(c.float()))
         return self.p_losses(x, c, t, *args, **kwargs)
 
-    @torch.no_grad() ####3only for inverse problem solving
+    # @torch.no_grad() ####3only for inverse problem solving
     def apply_model(self, x_noisy, t, cond, return_ids=False):
 
         if isinstance(cond, dict):

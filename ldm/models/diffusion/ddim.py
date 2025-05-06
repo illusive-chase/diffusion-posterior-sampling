@@ -264,11 +264,10 @@ class DDIMSampler(object):
             encoded_z_0 = self.model.get_first_stage_encoding(encoded_z_0)
             inpaint_error = torch.linalg.norm(encoded_z_0 - pred_z_0)
             
-            error = inpaint_error * gamma + meas_error * omega
-            anealed = error * (self.a * (-t / 999 * self.b).exp())
-            gradients = torch.autograd.grad(anealed, inputs=z_t)[0]
+            error = inpaint_error * gamma + meas_error * omega * (self.a * (-t / 999 * self.b).exp())
+            gradients = torch.autograd.grad(error, inputs=z_t)[0]
             z_prev = z_prev - gradients
-            print(f'Loss: {error.item():.3f}, Anealed Loss: {anealed.item():.3f}')
+            print(f'Inpaint Loss: {inpaint_error.item() * gamma:.3f}, Measure Loss: {omega * meas_error.item():.3f}, Anealed Loss: {(meas_error * omega * (self.a * (-t / 999 * self.b).exp())).item():.3f}')
             
             return z_prev.detach(), pred_z_0.detach()
         
